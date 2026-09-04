@@ -1,0 +1,52 @@
+{
+  "name": "oh-my-octos",
+  "version": "0.1.0",
+  "author": "octos-org",
+  "description": "Curated defaults for Octos as a coding agent: work discipline prompt, deterministic edit checks, project-instruction injection, session budget guard.",
+  "timeout_secs": 30,
+  "requires_network": false,
+  "tools": [],
+  "discovery": {
+    "summary": "Work discipline rules plus deterministic hooks (edit syntax checks, AGENTS.md injection, session budget guard). No tools to call; read prompts/discipline.md for the rules."
+  },
+  "prompts": {
+    "include": [
+      "prompts/*.md"
+    ]
+  },
+  "hooks": [
+    {
+      "event": "user_prompt_submit",
+      "command": [
+        "./hooks/project_context.py"
+      ],
+      "timeout_ms": 5000
+    },
+    {
+      "event": "after_tool_call",
+      "command": [
+        "./hooks/edit_check.py"
+      ],
+      "timeout_ms": 15000,
+      "tool_filter": [
+        "write_file",
+        "edit_file",
+        "diff_edit"
+      ]
+    },
+    {
+      "event": "after_llm_call",
+      "command": [
+        "./hooks/cost_guard.py"
+      ],
+      "timeout_ms": 3000
+    },
+    {
+      "event": "before_llm_call",
+      "command": [
+        "./hooks/cost_guard.py"
+      ],
+      "timeout_ms": 3000
+    }
+  ]
+}
