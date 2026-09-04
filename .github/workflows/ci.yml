@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  unit:
+    name: unit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: syntax
+        run: |
+          bash -n install.sh tests/e2e.sh
+          python3 -m py_compile hooks/*.py tests/*.py tests/lib/*.py
+          python3 -c "import json; json.load(open('manifest.json'))"
+      - name: hook scripts are executable
+        run: test -x hooks/edit_check.py && test -x hooks/cost_guard.py && test -x hooks/project_context.py
+      - name: unit tests
+        run: python3 tests/test_hooks.py
+
+  e2e:
+    # Real octos, real model. Runs only when the repository has a DEEPSEEK_API_KEY secret.
+    name: e2e (macos, octos ${{ env.OCTOS_VERSION }})
+    runs-on: macos-latest
+    needs: unit
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      OCTOS_VERSION: v2.0.3-rc.10
+    steps:
+      - uses: actions/checkout@v4
+      - name: skip without a key
+        id: key
+        run: |
+          if [ -n "${{ secrets.DEEPSEEK_API_KEY }}" ]; then echo "present=1" >> "$GITHUB_OUTPUT"; else echo "present=0" >> "$GITHUB_OUTPUT"; echo "no DEEPSEEK_API_KEY secret; e2e skipped"; fi
+      - name: fetch octos
+        if: steps.key.outputs.present == '1'
+        run: |
+          mkdir -p "$RUNNER_TEMP/octos"
+          curl -fsSL "https://github.com/octos-org/octos/releases/download/${OCTOS_VERSION}/octos-bundle-aarch64-apple-darwin.tar.gz" | tar xz -C "$RUNNER_TEMP/octos"
+          "$RUNNER_TEMP/octos/octos" --version
+      - name: e2e
+        if: steps.key.outputs.present == '1'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          export OCTOS_BIN="$RUNNER_TEMP/octos/octos"
+          bash tests/e2e.sh

@@ -11,6 +11,7 @@
 #   DEEPSEEK_API_KEY     or set OMO_E2E_PROVIDER / OMO_E2E_MODEL / OMO_E2E_KEY_ENV for another provider
 # Optional:
 #   OMO_E2E_KEEP=1       keep the work dir for inspection
+#   OMO_E2E_SKIP_REMOTE=1 skip the cases that install from github.com/octos-org/oh-my-octos
 #   OMO_E2E_WORK_ROOT    parent of the throwaway work dir (default /tmp; keep it short)
 #   OMO_E2E_SKIP_SERVE=1 skip the `octos serve --stdio` case
 set -u  # no pipefail: `cmd | grep -q` closes the pipe early and octos would report SIGPIPE
@@ -254,6 +255,35 @@ if printf '%s' "$C" | grep -q "exit_code=0 stdout_len=0" && printf '%s' "$A" | g
   result "plain dir: no AGENTS.md, no git -> project_context injects nothing" PASS
 else
   result "plain dir: project_context injects nothing" FAIL "ctx=[$C] answer=$(printf '%s' "$A" | head -c 80)"
+fi
+
+# ----------------------------------------------------------------------------- 17 install from GitHub (the command in the README)
+if [ "${OMO_E2E_SKIP_REMOTE:-0}" = "1" ]; then
+  result "remote: octos skills install octos-org/oh-my-octos" SKIP "OMO_E2E_SKIP_REMOTE=1"
+else
+  P="$WORK/t17-remote"; mkdir -p "$P"
+  if (cd "$P" && "$OCTOS_BIN" skills install octos-org/oh-my-octos >"$P/install.log" 2>&1) \
+     && [ -x "$P/.octos/skills/oh-my-octos/hooks/edit_check.py" ] \
+     && (cd "$P" && "$OCTOS_BIN" skills update oh-my-octos >"$P/update.log" 2>&1) \
+     && [ -f "$P/.octos/skills/oh-my-octos/manifest.json" ]; then
+    chat "$P" "Without using any tools: do your instructions include a section titled 'oh-my-octos work discipline'? Answer YES or NO." --sandbox read-only
+    if printf '%s' "$(answer)" | grep -q "^YES"; then
+      result "remote: install from GitHub, update, prompt active" PASS
+    else
+      result "remote: install from GitHub" FAIL "installed but prompt not active: $(answer | head -c 100)"
+    fi
+  else
+    result "remote: install from GitHub" FAIL "$(tail -2 "$P/install.log" "$P/update.log" 2>/dev/null | tr '\n' ' ' | head -c 300)"
+  fi
+
+  # curl | bash path from the README's agent prompt
+  P="$WORK/t18-curl"; mkdir -p "$P"
+  if (cd "$P" && PATH="$(dirname "$OCTOS_BIN"):$PATH" OMO_SKIP_BINARY_INSTALL=1 bash -c 'curl -fsSL https://raw.githubusercontent.com/octos-org/oh-my-octos/main/install.sh | bash -s -- --project "$PWD" --no-serve' </dev/null >"$P/curl.log" 2>&1) \
+     && [ -f "$P/.octos/skills/oh-my-octos/manifest.json" ]; then
+    result "remote: curl install.sh | bash -s -- --project" PASS
+  else
+    result "remote: curl install.sh | bash" FAIL "$(tail -3 "$P/curl.log" | tr '\n' ' ' | head -c 300)"
+  fi
 fi
 
 echo
