@@ -1,10 +1,9 @@
 ---
 name: oh-my-octos
-description: Curated defaults for Octos as a coding agent - work discipline prompt, deterministic edit checks, project-instruction injection, and a session budget guard. Installs as one skill; nothing to configure.
-version: 0.1.0
+description: Curated defaults for Octos as a coding agent - work discipline prompt, deterministic edit checks, project-instruction injection, and a session budget guard. One Rust binary; nothing to configure.
+version: 0.2.0
 author: octos-org
 always: false
-requires_bins: python3
 ---
 
 # oh-my-octos
@@ -16,10 +15,12 @@ Install it once, keep using `octos chat`, `octoscode`, or `octos serve` exactly 
 
 | Piece | Mechanism | Effect |
 |---|---|---|
-| `prompts/discipline.md` | prompt fragment (`prompts.include`) | Nine work rules appended to the system prompt. Verify before claiming, act on hook feedback, smallest diff, and so on. |
-| `hooks/project_context.py` | `user_prompt_submit` | Injects the repo-root `AGENTS.md` or `CLAUDE.md` (when `.octos/AGENTS.md` is absent) plus a one-line git summary at the start of every turn. |
-| `hooks/edit_check.py` | `after_tool_call` on `write_file`, `edit_file`, `diff_edit` | Re-reads the edited file from disk and reports syntax errors (py, json, toml, sh, js) and conflict markers back to the model as `[hook]` feedback. Silent when clean. |
-| `hooks/cost_guard.py` | `after_llm_call` + `before_llm_call` | Records session spend; denies further model calls once it passes `OMO_SESSION_BUDGET_USD` (default 10). |
+| `prompts/discipline.md` | prompt fragment (`prompts.include`) | Nine work rules appended to the system prompt: verify before claiming, act on hook feedback, smallest diff, and so on. |
+| `main hook project-context` | `user_prompt_submit` | Injects the repo-root `AGENTS.md` or `CLAUDE.md` (when `.octos/AGENTS.md` is absent) plus a one-line git summary at the start of every turn. |
+| `main hook edit-check` | `after_tool_call` on `write_file`, `edit_file`, `diff_edit` | Re-reads the edited file from disk and reports syntax errors (py, json, toml, sh, js), conflict markers and empty files back to the model as `[hook]` feedback. Silent when clean. |
+| `main hook cost-guard` | `after_llm_call` + `before_llm_call` | Records session spend; denies further model calls once it passes `OMO_SESSION_BUDGET_USD` (default 10). |
+
+`main` is the `oh-my-octos` binary (Rust, no runtime dependencies). Octos downloads it from the GitHub release for your platform at install time, or builds it with `cargo build --release` when no prebuilt binary matches.
 
 ## Install
 

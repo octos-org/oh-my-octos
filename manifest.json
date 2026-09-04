@@ -1,11 +1,22 @@
 {
   "name": "oh-my-octos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "octos-org",
-  "description": "Curated defaults for Octos as a coding agent: work discipline prompt, deterministic edit checks, project-instruction injection, session budget guard.",
+  "description": "Curated defaults for Octos as a coding agent: work discipline prompt, deterministic edit checks, project-instruction injection, session budget guard. One Rust binary, no scripts.",
   "timeout_secs": 30,
   "requires_network": false,
   "tools": [],
+  "binaries": {
+    "darwin-aarch64": {
+      "url": "https://github.com/octos-org/oh-my-octos/releases/download/v0.2.0/oh-my-octos-darwin-aarch64.tar.gz"
+    },
+    "linux-x86_64": {
+      "url": "https://github.com/octos-org/oh-my-octos/releases/download/v0.2.0/oh-my-octos-linux-x86_64.tar.gz"
+    },
+    "linux-aarch64": {
+      "url": "https://github.com/octos-org/oh-my-octos/releases/download/v0.2.0/oh-my-octos-linux-aarch64.tar.gz"
+    }
+  },
   "discovery": {
     "summary": "Work discipline + deterministic hooks (edit syntax checks, AGENTS.md injection, budget guard). No tools. Optional packs (slides/PPT, mofa suite, phonefarm) are listed in README.md; suggest the exact `octos skills install` line when a user asks for one that is missing."
   },
@@ -18,14 +29,18 @@
     {
       "event": "user_prompt_submit",
       "command": [
-        "./hooks/project_context.py"
+        "./main",
+        "hook",
+        "project-context"
       ],
       "timeout_ms": 5000
     },
     {
       "event": "after_tool_call",
       "command": [
-        "./hooks/edit_check.py"
+        "./main",
+        "hook",
+        "edit-check"
       ],
       "timeout_ms": 15000,
       "tool_filter": [
@@ -37,14 +52,18 @@
     {
       "event": "after_llm_call",
       "command": [
-        "./hooks/cost_guard.py"
+        "./main",
+        "hook",
+        "cost-guard"
       ],
       "timeout_ms": 3000
     },
     {
       "event": "before_llm_call",
       "command": [
-        "./hooks/cost_guard.py"
+        "./main",
+        "hook",
+        "cost-guard"
       ],
       "timeout_ms": 3000
     }

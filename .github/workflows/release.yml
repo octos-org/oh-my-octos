@@ -1,0 +1,55 @@
+name: release
+
+# Tag `vX.Y.Z` -> prebuilt binaries attached to the GitHub release. manifest.json
+# points `binaries` at these URLs, so `octos skills install octos-org/oh-my-octos`
+# downloads instead of compiling.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.key }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin, key: darwin-aarch64 }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, key: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, key: linux-aarch64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo build --release --target ${{ matrix.target }}
+      - name: package
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/oh-my-octos" dist/oh-my-octos
+          tar -C dist -czf "oh-my-octos-${{ matrix.key }}.tar.gz" oh-my-octos
+          shasum -a 256 "oh-my-octos-${{ matrix.key }}.tar.gz" > "oh-my-octos-${{ matrix.key }}.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.key }}
+          path: oh-my-octos-${{ matrix.key }}.tar.gz*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$tag" -R "$GITHUB_REPOSITORY" --title "$tag" --notes "oh-my-octos $tag"
+          gh release upload "$tag" -R "$GITHUB_REPOSITORY" --clobber assets/*
