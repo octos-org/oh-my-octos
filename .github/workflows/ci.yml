@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: syntax
         run: |
+          uname -m
           bash -n install.sh tests/e2e.sh
           python3 -m py_compile hooks/*.py tests/*.py tests/lib/*.py
           python3 -c "import json; json.load(open('manifest.json'))"
@@ -27,7 +28,7 @@ jobs:
 
   e2e:
     # Real octos, real model. Runs only when the repository has a DEEPSEEK_API_KEY secret.
-    name: e2e (macos, octos ${{ env.OCTOS_VERSION }})
+    name: e2e (macos)
     runs-on: macos-latest
     needs: unit
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
