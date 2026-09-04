@@ -11,7 +11,8 @@ Kept here so the next person does not have to re-read `octos-agent` to change a 
 - `on_turn_end` is documented but never fired by the runtime (no call site in rc.10 or main). Do not register anything on it.
 - `write_file`, `read_file`, `shell` are "sensitive": their `arguments` in the payload are redacted down to the path keys, and `result` is `[redacted: sensitive tool output]`. Read the file from disk in the hook instead. `edit_file` / `diff_edit` arguments are visible but truncated at 1 KiB.
 - The hook child runs with cwd = workspace root and the parent's environment minus API-key-looking names and the injection denylist (`LD_PRELOAD`, `DYLD_*`, `PYTHONPATH`, ...). `PATH`, `HOME`, `TMPDIR` survive. A budget variable must not contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD` or it is stripped.
-- `session_id` is present under `octos serve` and absent under `octos chat` (the cost guard keys on the parent pid in that case).
+- `session_id` / `profile_id` are absent from the `before_llm_call` / `after_llm_call` / `after_tool_call` payloads on both `octos chat` and `octos serve` (rc.10; the serve log line shows the session, the payload does not). The cost guard therefore keys its state on the parent pid: one bucket per `octos chat` process, one bucket per `octos serve` process. Worth an upstream fix: `HookContext` is only populated on some paths.
+- `session_cost` in `after_llm_call` is cumulative for the session (verified: 0.0040 → 0.0080 over two iterations).
 - `after_tool_call` hooks are debounced per session for the built-in coding checkers' sake; an identical edit within the window can be coalesced.
 - A `before_llm_call` deny ends the turn with an error (`octos chat --json` prints `{"error": "LLM call denied by hook: ..."}` and exits 1). The runtime classifies it as an internal harness error in its log; that is cosmetic.
 

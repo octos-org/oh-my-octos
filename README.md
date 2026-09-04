@@ -18,7 +18,7 @@ Then keep using Octos exactly as before. Remove with `octos skills remove oh-my-
 1. **Work discipline** (`prompts/discipline.md`). Nine rules appended to the system prompt: verify before claiming, report what happened, smallest diff, act on hook feedback, unique match text, stop when done.
 2. **Project instructions every turn** (`hooks/project_context.py`). The repo-root `AGENTS.md` or `CLAUDE.md` is injected at the start of each turn when the workspace has no `.octos/AGENTS.md`, plus one line of git state.
 3. **Deterministic edit checks** (`hooks/edit_check.py`). After every `write_file` / `edit_file` / `diff_edit`, the file is re-read from disk and checked: Python, JSON, TOML, shell and JavaScript syntax, merge-conflict markers, empty file. Problems come back to the model as `[hook] ...` in the tool result. Clean files produce nothing.
-4. **Session budget guard** (`hooks/cost_guard.py`). Spend per session is recorded from Octos's own cost accounting; once it passes `OMO_SESSION_BUDGET_USD` (default 10) further model calls are denied with a message telling the agent to summarize and stop.
+4. **Session budget guard** (`hooks/cost_guard.py`). Spend is recorded from Octos's own cost accounting; once it passes `OMO_SESSION_BUDGET_USD` (default 10) further model calls are denied with a message telling the agent to summarize and stop. One bucket per `octos chat` process; under `octos serve` one bucket per server process, because Octos does not yet pass the session id to LLM hooks. Spend idle for four hours is forgotten.
 
 Everything is a prompt fragment or a stdlib Python hook. No new vocabulary, no config file, no daemon.
 
@@ -71,7 +71,7 @@ python3 tests/test_hooks.py                       # hook scripts against synthet
 OCTOS_BIN=/path/to/octos DEEPSEEK_API_KEY=... tests/e2e.sh   # real octos, isolated OCTOS_HOME
 ```
 
-The e2e suite installs the skill into a throwaway home, runs `octos chat` and `octos serve --stdio`, and asserts each hook fired and each prompt fragment reached the model. It never touches `~/.octos`.
+The e2e suite installs the skill into a throwaway home and asserts each hook fired and each prompt fragment reached the model, using octos's own log lines as evidence rather than the model's wording. It covers `octos chat` and `octos serve --stdio`, the install script's guided and interactive paths, the optional packs, and two realistic sessions: a five-turn create/test/break/fix/verify session under `serve`, and a bug fix in an existing git repo under `chat`. It never touches `~/.octos`. The JavaScript check case is skipped when `node` is not installed.
 
 ## License
 

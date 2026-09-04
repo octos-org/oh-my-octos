@@ -178,6 +178,84 @@ else
   result "packs: install.sh --with slides,phonefarm" FAIL "$(grep -iE 'slides|phonefarm|FAILED' "$P/install-sh.log" | tail -4 | tr '\n' ' ' | head -c 300)"
 fi
 
+# ----------------------------------------------------------------------------- 11 interactive pack menu (pty)
+P="$WORK/t11-menu"; mkdir -p "$P"
+if python3 "$ROOT/tests/menu_case.py" "$(dirname "$OCTOS_BIN")" "$ROOT" "$P" >"$P/menu.log" 2>&1; then
+  result "packs: interactive menu in a terminal installs the chosen pack" PASS
+else
+  result "packs: interactive menu" FAIL "$(tail -3 "$P/menu.log" | tr '\n' ' ' | head -c 300)"
+fi
+
+# ----------------------------------------------------------------------------- 12 JavaScript project under octos chat (node --check)
+if command -v node >/dev/null 2>&1; then
+  P="$(new_project t12-js)"
+  printf '{"name":"t12","version":"1.0.0","private":true}\n' > "$P/package.json"
+  chat "$P" "Use the write_file tool to create app.js containing exactly this one line (deliberate syntax error for a test; do not fix it, do not run it):
+function f( {
+After the tool result comes back, reply with every line of the tool result that contains 'edit_check' copied verbatim, or the word NONE if there is no such line. Then stop." --sandbox workspace-write --ask-for-approval never
+  A="$(answer)"; H="$(hook_line edit_check.py)"
+  if [ -f "$P/app.js" ] && printf '%s' "$H" | grep -q "exit_code=1" && printf '%s' "$A" | grep -q "javascript syntax error"; then
+    result "edit: JavaScript syntax error fed back (node --check)" PASS
+  else
+    result "edit: JavaScript syntax error fed back" FAIL "hook=[$H] answer=$(printf '%s' "$A" | head -c 200)"
+  fi
+else
+  result "edit: JavaScript syntax error fed back" SKIP "node not installed"
+fi
+
+# ----------------------------------------------------------------------------- 13 tsconfig.json with comments is not a false positive (real write_file)
+P="$(new_project t13-jsonc)"
+chat "$P" "Use the write_file tool to create tsconfig.json with exactly this content:
+{
+  // strict mode
+  \"compilerOptions\": { \"strict\": true, },
+}
+After the tool result comes back, reply with every line of the tool result that contains '[hook]' copied verbatim, or the word NONE if there is no such line. Then stop." --sandbox workspace-write --ask-for-approval never
+A="$(answer)"; H="$(hook_line edit_check.py)"
+if [ -f "$P/tsconfig.json" ] && printf '%s' "$H" | grep -q "exit_code=0" && printf '%s' "$A" | grep -q "NONE"; then
+  result "edit: JSON with comments (tsconfig) produces no feedback" PASS
+else
+  result "edit: JSON with comments (tsconfig)" FAIL "hook=[$H] answer=$(printf '%s' "$A" | head -c 200)"
+fi
+
+# ----------------------------------------------------------------------------- 14 realistic multi-turn serve scenario
+if [ "${OMO_E2E_SKIP_SERVE:-0}" = "1" ]; then
+  result "scenario: multi-turn coding session under serve" SKIP "OMO_E2E_SKIP_SERVE=1"
+else
+  P="$WORK/t14-scenario"; mkdir -p "$P"
+  if python3 "$ROOT/tests/scenario_serve.py" "$OCTOS_BIN" "$P" "$OCTOS_HOME" "$ROOT" "$PROVIDER" "$MODEL" "$KEY_ENV" >"$P/scenario.log" 2>&1; then
+    result "scenario: multi-turn coding session under serve (create, test, break, fix, verify)" PASS
+  else
+    result "scenario: multi-turn coding session under serve" FAIL "$(grep -E '^FAIL' "$P/scenario.log" | tr '\n' ' ' | head -c 300)"
+  fi
+fi
+
+# ----------------------------------------------------------------------------- 15 fix a bug in an existing repo (edit_file path, tests run)
+P="$(new_project t15-fix)"
+mkdir -p "$P/pkg" "$P/tests"
+printf 'def clamp(x, lo, hi):\n    """Clamp x into [lo, hi]."""\n    if x < lo:\n        return hi\n    if x > hi:\n        return hi\n    return x\n' > "$P/pkg/__init__.py"
+printf 'import unittest\nfrom pkg import clamp\n\nclass T(unittest.TestCase):\n    def test_low(self):\n        self.assertEqual(clamp(-5, 0, 10), 0)\n    def test_high(self):\n        self.assertEqual(clamp(50, 0, 10), 10)\n    def test_mid(self):\n        self.assertEqual(clamp(5, 0, 10), 5)\n' > "$P/tests/test_pkg.py"
+touch "$P/tests/__init__.py"
+printf '# pkg\n\nRun tests with `python3 -m unittest -v`.\n' > "$P/AGENTS.md"
+(cd "$P" && git init -q && git -c user.email=t@t -c user.name=t add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm init)
+chat "$P" "tests/test_pkg.py has a failing test. Find the bug in pkg/__init__.py, fix it with the smallest change, run the test suite, and report the result." --sandbox workspace-write --ask-for-approval never
+A="$(answer)"; H="$(hook_line edit_check.py)"; C="$(hook_line project_context.py)"
+if (cd "$P" && python3 -m unittest >/dev/null 2>&1) && printf '%s' "$H" | grep -q "exit_code=0" && printf '%s' "$C" | grep -Eq "stdout_len=[1-9]" && printf '%s' "$A" | grep -Eq "OK|Ran [0-9]+ tests|pass"; then
+  result "scenario: bug fix in an existing repo (edit, clean hook, tests green, git context injected)" PASS
+else
+  result "scenario: bug fix in an existing repo" FAIL "tests=$(cd "$P" && python3 -m unittest 2>&1 | tail -1) hook=[$H] ctx=[$C] answer=$(printf '%s' "$A" | head -c 160)"
+fi
+
+# ----------------------------------------------------------------------------- 16 plain directory: nothing injected, nothing denied
+P="$(new_project t16-plain)"
+chat "$P" "Reply with exactly the word OK." --sandbox read-only
+A="$(answer)"; C="$(hook_line project_context.py)"
+if printf '%s' "$C" | grep -q "exit_code=0 stdout_len=0" && printf '%s' "$A" | grep -q "OK" && ! grep -q "denied" "$ERR"; then
+  result "plain dir: no AGENTS.md, no git -> project_context injects nothing" PASS
+else
+  result "plain dir: project_context injects nothing" FAIL "ctx=[$C] answer=$(printf '%s' "$A" | head -c 80)"
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL skipped=$SKIP  work=$WORK"
 [ "${OMO_E2E_KEEP:-0}" = "1" ] || [ "$FAIL" != 0 ] || rm -rf "$WORK"

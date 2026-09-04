@@ -21,6 +21,12 @@ import shutil
 import subprocess
 import sys
 
+# Paths and messages may be non-ASCII; never let stdout encoding take the hook down.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 MAX_BYTES = 2 * 1024 * 1024
 CONFLICT = re.compile(r"^(<{7} |={7}$|>{7} )", re.M)
 
@@ -44,12 +50,50 @@ def check_python(src, path):
     return []
 
 
+# Files that are JSON-with-comments by convention (tsconfig, VS Code settings, ...).
+JSONC_NAMES = re.compile(r"(^|/)(tsconfig[^/]*\.json|jsconfig\.json|\.vscode/[^/]+\.json|devcontainer\.json|[^/]+\.jsonc)$")
+_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
+_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+
+
+def _strip_jsonc(src):
+    # Remove comments outside of strings, then trailing commas. Good enough for config files.
+    out, i, n, in_str = [], 0, len(src), False
+    while i < n:
+        c = src[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(src[i + 1]); i += 2; continue
+            if c == '"':
+                in_str = False
+            i += 1
+        elif c == '"':
+            in_str = True; out.append(c); i += 1
+        elif src.startswith("//", i):
+            j = src.find("\n", i); i = n if j < 0 else j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2); i = n if j < 0 else j + 2
+        else:
+            out.append(c); i += 1
+    return _TRAILING_COMMA.sub(r"\1", "".join(out))
+
+
 def check_json(src, path):
     try:
         json.loads(src)
+        return []
     except ValueError as e:
-        return ["invalid JSON: %s" % e]
-    return []
+        strict_err = e
+    # Second chance: JSON with comments / trailing commas is valid for many tools.
+    try:
+        json.loads(_strip_jsonc(src))
+        return []
+    except ValueError:
+        pass
+    if JSONC_NAMES.search(path.replace(os.sep, "/")):
+        return ["invalid JSON (comments and trailing commas were tolerated): %s" % strict_err]
+    return ["invalid JSON: %s" % strict_err]
 
 
 def check_toml(src, path):
@@ -74,11 +118,22 @@ def run(cmd, timeout=10):
 
 
 def check_shell(src, path):
-    if not shutil.which("bash"):
+    # Honour the shebang: a .sh file may be zsh or fish; only check with the shell it names.
+    first = src.split("\n", 1)[0]
+    shell = "bash"
+    if first.startswith("#!"):
+        m = re.search(r"(bash|zsh|sh|dash|ksh|fish)\b", first)
+        if not m:
+            return []
+        shell = m.group(1)
+        if shell == "fish":
+            return []  # fish has no reliable -n; skip
+    if not shutil.which(shell):
         return []
-    rc, out = run(["bash", "-n", path])
+    rc, out = run([shell, "-n", path])
     if rc not in (0, None):
-        return ["shell syntax error: %s" % out.splitlines()[-1] if out else "shell syntax error"]
+        last = out.splitlines()[-1] if out else "%s -n failed" % shell
+        return ["shell syntax error: %s" % last]
     return []
 
 
@@ -115,10 +170,13 @@ def check_file(path):
     if size > MAX_BYTES:
         return []
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            src = f.read()
+        with open(path, "rb") as f:
+            raw = f.read()
     except OSError:
         return findings
+    if b"\x00" in raw[:8192]:
+        return []  # binary; nothing to check
+    src = raw.decode("utf-8", errors="replace")
     if CONFLICT.search(src):
         findings.append("unresolved merge conflict markers (<<<<<<< / ======= / >>>>>>>)")
     ext = os.path.splitext(path)[1].lower()

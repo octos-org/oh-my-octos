@@ -86,8 +86,15 @@ HOME_DIR="${OCTOS_HOME:-$HOME/.octos}"
 if [ -f "$HOME_DIR/config.json" ] || [ -f "$HOME_DIR/.octos/config.json" ]; then
   ok "config exists under $HOME_DIR"
 elif [ -t 0 ]; then
-  echo "    no config yet; running 'octos init' (interactive: pick a provider and a real model name)"
-  octos init --cwd "$HOME_DIR"
+  # `octos init --cwd X` writes X/.octos/config.json, and octos reads <OCTOS_HOME>/config.json,
+  # so init must run one level above the home dir. That only lines up when the home dir is
+  # literally named `.octos` (the default); otherwise leave it to the user.
+  if [ "$(basename "$HOME_DIR")" = ".octos" ]; then
+    echo "    no config yet; running 'octos init' (interactive: pick a provider and a real model name)"
+    octos init --cwd "$(dirname "$HOME_DIR")"
+  else
+    fail "no config at $HOME_DIR/config.json; run 'octos init' in the directory that contains it, then re-run"
+  fi
 else
   fail "no config and no terminal to run 'octos init'; run it yourself, then re-run this script"
 fi
@@ -104,8 +111,9 @@ for p in (os.path.join(sys.argv[1], "config.json"), os.path.join(sys.argv[1], ".
 PY
 )"
 if [ -n "$PROVIDER" ]; then
-  if octos doctor 2>/dev/null | grep -qiE 'provider.*(configured|ok|\[✓\])' ; then
-    ok "provider $PROVIDER"
+  DOCTOR="$(octos doctor 2>/dev/null || true)"
+  if printf '%s' "$DOCTOR" | grep -q "API key — resolved"; then
+    ok "provider $PROVIDER, credential resolves"
   elif [ -t 0 ]; then
     echo "    signing in to $PROVIDER"
     octos auth login --provider "$PROVIDER" || fail "octos auth login failed"

@@ -16,6 +16,16 @@ import os
 import shutil
 import subprocess
 import sys
+import time
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+# The hook has a 5 s budget in the manifest; keep git well inside it.
+GIT_BUDGET_SECONDS = 2.5
+_deadline = [0.0]
 
 MAX_INSTRUCTION_CHARS = 6000
 INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md")
@@ -50,9 +60,13 @@ def instructions(root):
 def git(root, *args):
     if not shutil.which("git"):
         return None
+    remaining = _deadline[0] - time.monotonic()
+    if remaining <= 0.05:
+        return None
     try:
-        p = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, timeout=3)
+        p = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, timeout=remaining)
     except Exception:
+        _deadline[0] = 0.0  # one slow call: stop asking git anything else this turn
         return None
     if p.returncode != 0:
         return None
@@ -60,12 +74,15 @@ def git(root, *args):
 
 
 def git_line(root):
+    _deadline[0] = time.monotonic() + GIT_BUDGET_SECONDS
     if not os.path.isdir(os.path.join(root, ".git")) and git(root, "rev-parse", "--is-inside-work-tree") != "true":
         return None
     branch = git(root, "rev-parse", "--abbrev-ref", "HEAD") or "?"
-    status = git(root, "status", "--porcelain")
-    dirty = len([l for l in status.splitlines() if l.strip()]) if status is not None else 0
+    status = git(root, "status", "--porcelain", "--untracked-files=normal")
     last = git(root, "log", "-1", "--format=%h %s") or "no commits"
+    if status is None:
+        return "git: branch %s, last commit: %s (status skipped: repo too slow for this turn)" % (branch, last)
+    dirty = len([l for l in status.splitlines() if l.strip()])
     return "git: branch %s, %d uncommitted file(s), last commit: %s" % (branch, dirty, last)
 
 

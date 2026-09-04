@@ -6,7 +6,11 @@ Registered on two events:
   before_llm_call - exits 1 (deny) once spend passes the budget.
 
 Budget: OMO_SESSION_BUDGET_USD (default 10). Zero or negative disables the guard.
-State: one small JSON file per session under the system temp dir.
+State: one small JSON file per session under the system temp dir. Octos only puts a
+session id in the payload under `octos chat`-less paths where it is set; when it is
+absent (octos serve today) the parent process is the bucket, i.e. one budget per
+server process. State idle for more than STALE_SECONDS is ignored so a reused pid or
+a resumed day-old session starts from zero.
 Stdlib only. Never raises: any internal failure exits 0 so the guard can never block by accident.
 """
 import json
@@ -15,8 +19,14 @@ import sys
 import tempfile
 import time
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 DEFAULT_BUDGET_USD = 10.0
 STATE_TTL_SECONDS = 7 * 24 * 3600
+STALE_SECONDS = 4 * 3600
 
 
 def state_dir():
@@ -51,9 +61,13 @@ def budget():
 def load(path):
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except Exception:
         return {}
+    updated = data.get("updated")
+    if not isinstance(updated, (int, float)) or time.time() - updated > STALE_SECONDS:
+        return {}  # pid reuse or a long-idle session: do not carry old spend forward
+    return data
 
 
 def save(path, data):
@@ -89,6 +103,13 @@ def main():
         cost = payload.get("session_cost")
         if isinstance(cost, (int, float)):
             data = load(path)
+            prev = data.get("session_cost")
+            # session_cost is cumulative per session. Without a session id the bucket
+            # is the server process; a value LOWER than the last one can only mean a
+            # different (new) session started reporting, so the bucket starts over
+            # instead of denying the newcomer for the previous session's spend.
+            if isinstance(prev, (int, float)) and float(cost) < prev - 1e-9:
+                data = {}
             data["session_cost"] = float(cost)
             data["updated"] = time.time()
             data["model"] = payload.get("model")
