@@ -13,6 +13,8 @@ cd <project> && octos skills install octos-org/oh-my-octos
 
 Then keep using Octos exactly as before. Remove with `octos skills remove oh-my-octos`.
 
+`install.sh` does the whole path in order: octos binary, config, provider sign-in, this skill, optional packs, the [octoscode](https://github.com/octos-org/octoscode) terminal client, `octos doctor`.
+
 ## What you get
 
 1. **Work discipline** (`prompts/discipline.md`). Nine rules appended to the system prompt: verify before claiming, report what happened, smallest diff, act on hook feedback, unique match text, stop when done.
@@ -24,7 +26,21 @@ Everything is a prompt fragment or a stdlib Python hook. No new vocabulary, no c
 
 ## Why these four
 
-Each one either removes a whole class of failure or replaces "the model should remember to" with a check that always runs. Nothing gets added to this package without a measurement showing it moves a number (task pass rate, tokens per task, or failures avoided). See `tests/` for the end-to-end suite that gates every change.
+Each one either removes a whole class of failure or replaces "the model should remember to" with a check that always runs. Nothing gets added to this package without a measurement. See `tests/` for the end-to-end suite that gates every change and `tests/bench/` for the benchmark.
+
+## Measured
+
+`tests/bench/bench.py`, 2026-09-04, octos 2.0.3-rc.10, deepseek-v4-flash, six small graded coding tasks, two repeats each, same binary and flags in both arms. Medians per run:
+
+| | bare octos | with oh-my-octos |
+|---|---|---|
+| tasks passed | 12 / 12 | 12 / 12 |
+| model calls per task | 5 | 5 |
+| context tokens per call | 5,640 | 6,178 (+10%) |
+| wall time per task | 8.5 s | 8.4 s |
+| prefix cache hit rate | 97% | 96% |
+
+Reading: on tasks this easy the pass rate cannot move, so the honest number is the cost. The fixed overhead is about 540 tokens per call (the discipline text, the skill card, the per-turn project context). The hooks themselves are free when the file is clean. One run in the oh-my-octos arm took 15 calls instead of 7 because the discipline text made the model test its shell script under two shells and fix a real bug it found; that is the intended behaviour and it is the reason the arc-bench score, not this table, is the real gate. Re-run with `python3 tests/bench/bench.py --octos <bin>`; results land in `tests/bench/results.json`.
 
 ## Optional packs
 
@@ -71,7 +87,7 @@ python3 tests/test_hooks.py                       # hook scripts against synthet
 OCTOS_BIN=/path/to/octos DEEPSEEK_API_KEY=... tests/e2e.sh   # real octos, isolated OCTOS_HOME
 ```
 
-The e2e suite installs the skill into a throwaway home and asserts each hook fired and each prompt fragment reached the model, using octos's own log lines as evidence rather than the model's wording. It covers `octos chat` and `octos serve --stdio`, the install script's guided and interactive paths, the optional packs, and two realistic sessions: a five-turn create/test/break/fix/verify session under `serve`, and a bug fix in an existing git repo under `chat`. It never touches `~/.octos`. The JavaScript check case is skipped when `node` is not installed.
+The e2e suite installs the skill into a throwaway home and asserts each hook fired and each prompt fragment reached the model, using octos's own log lines as evidence rather than the model's wording. It covers `octos chat`, `octos serve --stdio`, and the real octoscode TUI driven through a pseudo-terminal (set `OCTOSCODE_BIN`, skipped otherwise), the install script's guided and interactive paths, the optional packs, installing from this GitHub repository, and two realistic sessions: a five-turn create/test/break/fix/verify session under `serve`, and a bug fix in an existing git repo under `chat`. It never touches `~/.octos`. The JavaScript check case is skipped when `node` is not installed.
 
 ## License
 

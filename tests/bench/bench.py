@@ -5,6 +5,12 @@ Same binary, same model, same flags, same prompts. The only difference between t
 arms is whether the skill is installed in the project. Each task is graded by a script,
 never by the model's own words. Token and iteration counts come from `octos chat -v` logs.
 
+Each arm keeps ONE project directory for the whole run (contents wiped between tasks,
+the installed skill kept), because the skill card in the system prompt carries the
+absolute skill path: a fresh directory per run would defeat the provider's prefix
+cache for the oh-my-octos arm only and misreport its input tokens. One unmeasured
+warm-up call per arm primes the cache so both arms start from the same state.
+
 usage: bench.py --octos <bin> [--repeats 2] [--tasks a,b,c] [--out results.json]
 env:   DEEPSEEK_API_KEY (or set --provider/--model/--key-env)
 """
@@ -113,12 +119,36 @@ TASKS = {
 
 
 # ----------------------------------------------------------------------------- runner
-def run_one(octos, home, arm, task, rep, work, provider, model, key_env):
-    p = work / ("%s-%s-%d" % (arm, task, rep)); p.mkdir()
+def arm_dir(work, arm):
+    p = work / arm / "proj"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def wipe(p):
+    for child in p.iterdir():
+        if child.name == ".octos":
+            continue
+        shutil.rmtree(child) if child.is_dir() else child.unlink()
+
+
+def env_for(home, work):
     env = dict(os.environ); env["OCTOS_HOME"] = str(home); env["TMPDIR"] = str(work / "tmp")
+    return env
+
+
+def warm_up(octos, home, arm, work):
+    p = arm_dir(work, arm); env = env_for(home, work)
     if arm == "omo":
         r = subprocess.run([octos, "skills", "install", str(ROOT), "--force"], cwd=p, env=env, capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
+    subprocess.run([octos, "chat", "--json", "--no-session-persistence", "--sandbox", "read-only", "-m", "Reply with exactly OK."],
+                   cwd=p, env=env, capture_output=True, text=True, timeout=300)
+
+
+def run_one(octos, home, arm, task, rep, work, provider, model, key_env):
+    p = arm_dir(work, arm); wipe(p)
+    env = env_for(home, work)
     setup, grade = TASKS[task]
     prompt = setup(p)
     t0 = time.time()
@@ -131,17 +161,19 @@ def run_one(octos, home, arm, task, rep, work, provider, model, key_env):
     except Exception:
         answer = r.stdout
     err = r.stderr
-    (p / "out.json").write_text(r.stdout); (p / "err.log").write_text(err)
-    calls = [m for m in re.finditer(r"LLM response received .*?input_tokens=(\d+) output_tokens=(\d+)", err)]
+    logdir = work / "logs" / ("%s-%s-%d" % (arm, task, rep)); logdir.mkdir(parents=True, exist_ok=True)
+    (logdir / "out.json").write_text(r.stdout); (logdir / "err.log").write_text(err)
+    calls = [m for m in re.finditer(r"LLM response received .*?input_tokens=(\d+) output_tokens=(\d+) cache_read_tokens=(\d+)", err)]
     inp = sum(int(m.group(1)) for m in calls); out = sum(int(m.group(2)) for m in calls)
+    cached = sum(int(m.group(3)) for m in calls)
     feedback = len(re.findall(r"edit_check\.py\"\] exit_code=1", err))
     try:
         passed = bool(grade(p, answer))
     except Exception:
         passed = False
     return {"arm": arm, "task": task, "rep": rep, "pass": passed, "llm_calls": len(calls),
-            "input_tokens": inp, "output_tokens": out, "wall_s": round(wall, 1),
-            "hook_feedback": feedback, "rc": r.returncode}
+            "input_tokens": inp, "cache_read_tokens": cached, "context_tokens": inp + cached,
+            "output_tokens": out, "wall_s": round(wall, 1), "hook_feedback": feedback, "rc": r.returncode}
 
 
 def main():
@@ -159,13 +191,15 @@ def main():
     home = work / "home"; home.mkdir()
     (home / "config.json").write_text(json.dumps({"provider": a.provider, "model": a.model, "api_key_env": a.key_env}))
     rows = []
+    for arm in ("bare", "omo"):
+        warm_up(a.octos, home, arm, work)
     for task in a.tasks.split(","):
         for rep in range(a.repeats):
             for arm in ("bare", "omo"):
                 row = run_one(a.octos, home, arm, task, rep, work, a.provider, a.model, a.key_env)
                 rows.append(row)
-                print("%-5s %-7s rep%d pass=%-5s calls=%-2d in=%-6d out=%-5d %5.0fs fb=%d" % (
-                    arm, task, rep, row["pass"], row["llm_calls"], row["input_tokens"], row["output_tokens"], row["wall_s"], row["hook_feedback"]), flush=True)
+                print("%-5s %-7s rep%d pass=%-5s calls=%-2d in=%-6d cached=%-6d out=%-5d %5.0fs fb=%d" % (
+                    arm, task, rep, row["pass"], row["llm_calls"], row["input_tokens"], row["cache_read_tokens"], row["output_tokens"], row["wall_s"], row["hook_feedback"]), flush=True)
     summary = {}
     for arm in ("bare", "omo"):
         rs = [r for r in rows if r["arm"] == arm]
@@ -173,6 +207,8 @@ def main():
                         "pass_rate": round(sum(r["pass"] for r in rs) / len(rs), 3),
                         "avg_llm_calls": round(sum(r["llm_calls"] for r in rs) / len(rs), 2),
                         "avg_input_tokens": round(sum(r["input_tokens"] for r in rs) / len(rs)),
+                        "avg_context_tokens": round(sum(r["context_tokens"] for r in rs) / len(rs)),
+                        "cache_hit_rate": round(sum(r["cache_read_tokens"] for r in rs) / max(1, sum(r["context_tokens"] for r in rs)), 3),
                         "avg_output_tokens": round(sum(r["output_tokens"] for r in rs) / len(rs)),
                         "avg_wall_s": round(sum(r["wall_s"] for r in rs) / len(rs), 1)}
     per_task = {}

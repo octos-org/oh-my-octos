@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash install.sh [--profile <id>] [--project <dir>] [--source <skill source>]
-#                   [--with slides,mofa,phonefarm] [--no-serve]
+#                   [--with slides,mofa,phonefarm] [--no-octoscode] [--no-serve]
 #
 # Optional packs (each is one existing `octos skills install` command; nothing is bundled):
 #   slides     PPT decks via mofa-slides           (mofa-org/mofa-skills/mofa-slides, ~11 MB; needs GEMINI_API_KEY and the `mofa` CLI)
@@ -15,8 +15,11 @@
 #   phonefarm  Android/OpenHarmony device automation (BH3GEI/phonefarm/skills/phonefarm)
 # In a terminal the script asks which packs you want; with --with or without a terminal it does not ask.
 #
+# octoscode (the terminal client) is installed when missing, via Homebrew on macOS or the
+# official installer script elsewhere; --no-octoscode skips that step.
+#
 # Environment:
-#   OMO_SKIP_BINARY_INSTALL=1   do not try to install octos when it is missing
+#   OMO_SKIP_BINARY_INSTALL=1   do not try to install octos or octoscode when they are missing
 
 set -euo pipefail
 
@@ -24,6 +27,7 @@ SOURCE="octos-org/oh-my-octos"
 PROFILE=""
 PROJECT=""
 START_SERVE=1
+INSTALL_OCTOSCODE=1
 WITH=""
 WITH_GIVEN=0
 
@@ -49,6 +53,7 @@ while [ $# -gt 0 ]; do
     --project) PROJECT="$2"; shift 2 ;;
     --source) SOURCE="$2"; shift 2 ;;
     --no-serve) START_SERVE=0; shift ;;
+    --no-octoscode) INSTALL_OCTOSCODE=0; shift ;;
     --with) WITH="$2"; WITH_GIVEN=1; shift 2 ;;
     -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -192,6 +197,28 @@ for pack in $WITH; do
   esac
 done
 
+# 4c. octoscode ----------------------------------------------------------------
+step "octoscode (terminal client)"
+if command -v octoscode >/dev/null 2>&1; then
+  ok "$(octoscode --version 2>/dev/null | head -1)"
+elif [ "$INSTALL_OCTOSCODE" = 0 ] || [ "${OMO_SKIP_BINARY_INSTALL:-0}" = "1" ]; then
+  echo "    skipped (install later: brew install octos-org/octoscode/octoscode, or npm install -g @octos-org/octoscode)"
+else
+  case "$(uname -s)" in
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        brew tap octos-org/octoscode https://github.com/octos-org/octoscode >/dev/null 2>&1 || true
+        brew install octos-org/octoscode/octoscode || echo "    octoscode: brew install failed; try: npm install -g @octos-org/octoscode"
+      else
+        curl -fsSL https://github.com/octos-org/octoscode/releases/latest/download/octoscode-installer.sh | sh || echo "    octoscode: installer failed"
+      fi ;;
+    Linux)
+      curl -fsSL https://github.com/octos-org/octoscode/releases/latest/download/octoscode-installer.sh | sh || echo "    octoscode: installer failed" ;;
+    *) echo "    octoscode: unsupported OS for this script; see https://github.com/octos-org/octoscode#install" ;;
+  esac
+  command -v octoscode >/dev/null 2>&1 && ok "$(octoscode --version 2>/dev/null | head -1)"
+fi
+
 # 5. doctor --------------------------------------------------------------------
 step "octos doctor"
 octos doctor || true
@@ -200,8 +227,8 @@ octos doctor || true
 step "next"
 if [ "$START_SERVE" = 1 ]; then
   cat <<TXT
+    octoscode                     # terminal client (spawns its own octos server)
     octos serve --solo            # then open http://localhost:50080
-    octos chat                    # terminal, in a project with the skill installed
-    brew install octos-org/octoscode/octoscode   # optional terminal client
+    octos chat                    # headless / one-shot, in a project with the skill installed
 TXT
 fi

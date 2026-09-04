@@ -28,3 +28,9 @@ Kept here so the next person does not have to re-read `octos-agent` to change a 
 - The serve data dir (`--data-dir` / `OCTOS_HOME`) must be a short path: it hosts a unix socket and macOS caps socket paths at 104 bytes.
 - `octos skills install <local path>` copies the whole directory, skipping `.git`. Keep work dirs and caches out of the checkout.
 - Serve logs land in `<data dir>/logs/serve.<date>.log`; `octos chat -v` prints the same lines to stderr.
+
+## octoscode (TUI) specifics
+
+- octoscode is a client only; with `--stdio-command "<octos> serve --stdio --solo --data-dir <dir>"` it runs the same server path the arc adapter and octoscode-web use, so skills installed with `octos skills --profile <id> install …` apply to all three.
+- Launching on a folder without `--session` shows an "Activate this folder?" menu that waits for Enter; `--session <id>` opens the session directly. `--prompt "<text>"` sends one startup turn as if typed. `--no-splash` skips the logo. Ctrl+Q quits.
+- The TUI does not print octos's log lines; evidence of hook activity is `<data dir>/logs/serve.<date>.log`.

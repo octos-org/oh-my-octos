@@ -12,6 +12,7 @@
 # Optional:
 #   OMO_E2E_KEEP=1       keep the work dir for inspection
 #   OMO_E2E_SKIP_REMOTE=1 skip the cases that install from github.com/octos-org/oh-my-octos
+#   OCTOSCODE_BIN        path to an octoscode binary for the TUI case (default: `octoscode` on PATH; skipped if absent)
 #   OMO_E2E_WORK_ROOT    parent of the throwaway work dir (default /tmp; keep it short)
 #   OMO_E2E_SKIP_SERVE=1 skip the `octos serve --stdio` case
 set -u  # no pipefail: `cmd | grep -q` closes the pipe early and octos would report SIGPIPE
@@ -283,6 +284,21 @@ else
     result "remote: curl install.sh | bash -s -- --project" PASS
   else
     result "remote: curl install.sh | bash" FAIL "$(tail -3 "$P/curl.log" | tr '\n' ' ' | head -c 300)"
+  fi
+fi
+
+# ----------------------------------------------------------------------------- 19 the real octoscode TUI in a pty
+OCTOSCODE_BIN="${OCTOSCODE_BIN:-$(command -v octoscode || true)}"
+if [ "${OMO_E2E_SKIP_SERVE:-0}" = "1" ]; then
+  result "tui: octoscode in a pty (startup prompt + composer), hooks in serve log" SKIP "OMO_E2E_SKIP_SERVE=1"
+elif [ -z "$OCTOSCODE_BIN" ] || [ ! -x "$OCTOSCODE_BIN" ]; then
+  result "tui: octoscode in a pty" SKIP "octoscode not installed (set OCTOSCODE_BIN)"
+else
+  P="$WORK/t19-tui"; mkdir -p "$P/proj" "$P/home"
+  if python3 "$ROOT/tests/tui_case.py" "$OCTOSCODE_BIN" "$OCTOS_BIN" "$P/proj" "$P/home" "$ROOT" "$PROVIDER" "$MODEL" "$KEY_ENV" >"$P/tui.log" 2>&1; then
+    result "tui: octoscode in a pty (startup prompt + composer), hooks in serve log" PASS
+  else
+    result "tui: octoscode in a pty" FAIL "$(grep -E '^(turn|evidence)' "$P/tui.log" | tr '\n' ' ' | head -c 300)"
   fi
 fi
 
