@@ -7,7 +7,7 @@
   "requires_network": false,
   "tools": [],
   "discovery": {
-    "summary": "Work discipline rules plus deterministic hooks (edit syntax checks, AGENTS.md injection, session budget guard). No tools to call; read prompts/discipline.md for the rules."
+    "summary": "Work discipline rules plus deterministic hooks (edit syntax checks, AGENTS.md injection, session budget guard). No tools to call; read prompts/discipline.md for the rules. Optional packs are one command each and are listed in README.md under 'Optional packs' (e.g. slides/PPT: `octos skills install mofa-org/mofa-skills/mofa-slides`); suggest the exact command when the user asks for a capability that is not installed."
   },
   "prompts": {
     "include": [

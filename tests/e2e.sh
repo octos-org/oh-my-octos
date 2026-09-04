@@ -168,6 +168,16 @@ else
   result "install.sh: guided path" FAIL "$(tail -4 "$P/install-sh.log" | tr '\n' ' ' | head -c 300)"
 fi
 
+# ----------------------------------------------------------------------------- 10 optional packs via install.sh --with
+P="$WORK/t10-packs"; mkdir -p "$P"
+if (cd "$P" && PATH="$(dirname "$OCTOS_BIN"):$PATH" OMO_SKIP_BINARY_INSTALL=1 bash "$ROOT/install.sh" --source "$ROOT" --project "$P" --with slides,phonefarm --no-serve </dev/null >"$P/install-sh.log" 2>&1) \
+   && [ -f "$P/.octos/skills/mofa-slides/manifest.json" ] && [ -f "$P/.octos/skills/phonefarm/SKILL.md" ] \
+   && grep -q "slides: octos skills install mofa-org/mofa-skills/mofa-slides" "$P/install-sh.log"; then
+  result "packs: install.sh --with slides,phonefarm installs both without prompting" PASS
+else
+  result "packs: install.sh --with slides,phonefarm" FAIL "$(grep -iE 'slides|phonefarm|FAILED' "$P/install-sh.log" | tail -4 | tr '\n' ' ' | head -c 300)"
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL skipped=$SKIP  work=$WORK"
 [ "${OMO_E2E_KEEP:-0}" = "1" ] || [ "$FAIL" != 0 ] || rm -rf "$WORK"

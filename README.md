@@ -26,12 +26,24 @@ Everything is a prompt fragment or a stdlib Python hook. No new vocabulary, no c
 
 Each one either removes a whole class of failure or replaces "the model should remember to" with a check that always runs. Nothing gets added to this package without a measurement showing it moves a number (task pass rate, tokens per task, or failures avoided). See `tests/` for the end-to-end suite that gates every change.
 
+## Optional packs
+
+Nothing below is bundled. Each line is one existing `octos skills install` command; `install.sh` asks which ones you want when run in a terminal (or takes `--with slides,phonefarm`).
+
+| Pack | Command | What it is |
+|---|---|---|
+| slides | `octos skills install mofa-org/mofa-skills/mofa-slides` | PPT decks with generated images (~11 MB). Needs `GEMINI_API_KEY` and the `mofa` CLI. |
+| mofa | `octos skills install mofa-org/mofa-skills` | The whole mofa suite: slides, cards, comics, podcast, PDF, XLSX, site, and more (20 skills, ~540 MB). |
+| phonefarm | `octos skills install BH3GEI/phonefarm/skills/phonefarm` | Android / OpenHarmony device automation, testing and telemetry. |
+
+Add `--profile <id>` after `skills` for `octos serve` / octoscode; run it inside the project for `octos chat`. The agent knows this table too: ask it for slides and it will tell you the exact command if the pack is missing.
+
 ## For AI agents
 
 Copy this to your agent (Claude Code, Codex, Cindy, octoscode, ...) to set up Octos with oh-my-octos:
 
 ```
-Install Octos and oh-my-octos on this machine. Follow https://raw.githubusercontent.com/octos-org/oh-my-octos/main/install.sh step by step: check for an existing octos binary, run `octos init` if there is no config, sign in with `octos auth login --provider <name>`, install the skill with `octos skills --profile <id> install octos-org/oh-my-octos` (and plainly `octos skills install octos-org/oh-my-octos` inside my project for `octos chat`), then run `octos doctor` and report what it says.
+Install Octos and oh-my-octos on this machine. Follow https://raw.githubusercontent.com/octos-org/oh-my-octos/main/install.sh step by step: check for an existing octos binary, run `octos init` if there is no config, sign in with `octos auth login --provider <name>`, install the skill with `octos skills --profile <id> install octos-org/oh-my-octos` (and plainly `octos skills install octos-org/oh-my-octos` inside my project for `octos chat`), ask me which optional packs I want (slides, mofa, phonefarm; see the Optional packs table in the README) and install those the same way, then run `octos doctor` and report what it says.
 ```
 
 ## Requirements
