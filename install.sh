@@ -171,10 +171,11 @@ for pack in $WITH; do
       [ -n "${GEMINI_API_KEY:-}" ] || echo "    note: GEMINI_API_KEY is not set; mofa skills need it (export it, or add it to the profile env)"
       if ! command -v mofa >/dev/null 2>&1; then
         # The skill's downloaded `main` is the mofa CLI itself; SKILL.md declares `requires_bins: mofa`.
+        hinted=0
         for d in "$PROJECT" "$PWD"; do
-          [ -n "$d" ] && [ -x "$d/.octos/skills/mofa-slides/main" ] && { echo "    note: put the mofa CLI on PATH, e.g.: mkdir -p ~/.local/bin && ln -sf \"$d/.octos/skills/mofa-slides/main\" ~/.local/bin/mofa"; break; }
+          [ -n "$d" ] && [ -x "$d/.octos/skills/mofa-slides/main" ] && { echo "    note: put the mofa CLI on PATH, e.g.: mkdir -p ~/.local/bin && ln -sf \"$d/.octos/skills/mofa-slides/main\" ~/.local/bin/mofa"; hinted=1; break; }
         done
-        command -v mofa >/dev/null 2>&1 || echo "    note: mofa CLI not on PATH (the mofa-slides skill ships it as <skills dir>/mofa-slides/main; symlink it as 'mofa')"
+        [ "$hinted" = 1 ] || echo "    note: mofa CLI not on PATH (the mofa-slides skill ships it as <skills dir>/mofa-slides/main; symlink it as 'mofa')"
       fi
       ;;
     phonefarm)
