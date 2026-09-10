@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>local.octos.serve</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/YOU/.local/bin/node</string>
+		<string>/Users/YOU/.local/lib/node_modules/@octos-org/octos/bin/octos.js</string>
+		<string>serve</string>
+		<string>--solo</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/YOU/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>TELEGRAM_BOT_TOKEN</key>
+		<string>REPLACE_OR_REMOVE</string>
+		<key>FEISHU_APP_ID</key>
+		<string>REPLACE_OR_REMOVE</string>
+		<key>FEISHU_APP_SECRET</key>
+		<string>REPLACE_OR_REMOVE</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/YOU</string>
+	<key>StandardOutPath</key>
+	<string>/Users/YOU/.octos/logs/serve.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/YOU/.octos/logs/serve.err.log</string>
+</dict>
+</plist>

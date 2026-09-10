@@ -1,0 +1,86 @@
+{
+	admin off
+	auto_https off
+	grace_period 10s
+}
+
+http://localhost:8080 {
+	bind 127.0.0.1 ::1
+
+	redir /launch /launch/ 308
+	redir /learn /learn/ 308
+	redir /code /code/ 308
+	redir /matrix-chat /matrix-chat/ 308
+
+	handle_path /launch/* {
+		root * {$HOME}/octos-clients/launch
+		try_files {path} /index.html
+		file_server
+		header {
+			Cache-Control "no-cache"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+	}
+
+	handle_path /learn/* {
+		root * {$HOME}/octos-clients/octos-learn/dist
+		try_files {path} /index.html
+		file_server
+		header {
+			Cache-Control "no-cache"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+	}
+
+	handle_path /code/* {
+		root * {$HOME}/octos-clients/octoscode-web/apps/web/dist
+		try_files {path} /index.html
+		file_server
+		header {
+			Cache-Control "no-cache"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+	}
+
+	handle_path /matrix-chat/* {
+		root * {$HOME}/octos-clients/matrix-chat
+		try_files {path} /index.html
+		file_server
+		header {
+			Cache-Control "no-cache"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+	}
+
+	handle /_matrix/* {
+		reverse_proxy 127.0.0.1:8008 {
+			header_up Host {http.request.host}
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:50080 {
+			header_up Host {http.request.host}
+			header_up -Origin
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Host
+			header_up -X-Real-IP
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:50080 {
+			header_up Host {http.request.host}
+			header_up -Origin
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Host
+			header_up -X-Real-IP
+		}
+	}
+}
