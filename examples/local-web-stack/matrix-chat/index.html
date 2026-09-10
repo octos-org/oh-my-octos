@@ -27,6 +27,8 @@
   <script>
     // Same-origin: Caddy proxies /_matrix/* to Synapse, so no CORS setup is needed.
     const API = "/_matrix/client/v3";
+    // Bare localpart only (e.g. "octos", not "@octos:localhost") — the senders
+    // are compared against this after stripping the @ and :server parts.
     const USER = "REPLACE_WITH_MATRIX_USER";
     const PASSWORD = "REPLACE_WITH_MATRIX_PASSWORD";
     const ROOM = "REPLACE_WITH_ROOM_ID";
@@ -35,8 +37,18 @@
     const inputEl = document.getElementById("input");
     let token = localStorage.getItem("octos_matrix_token") || "";
 
+    // The history backfill and the first /sync overlap (a stored `since` token
+    // covers events the backfill also returns), so events are deduped by id —
+    // otherwise every revisit double-renders the recent window. Bounded so a
+    // long-lived page does not grow it forever.
+    const seen = new Set();
     function renderEvent(event) {
       if (event.type !== "m.room.message") return;
+      if (event.event_id) {
+        if (seen.has(event.event_id)) return;
+        seen.add(event.event_id);
+        if (seen.size > 5000) seen.delete(seen.values().next().value);
+      }
       const sender = event.sender.split(":")[0].replace("@", "");
       const div = document.createElement("div");
       div.className = "msg" + (sender === USER ? " me" : "");
@@ -62,7 +74,13 @@
     async function start() {
       try {
         if (!token) await login();
-        const hist = await fetch(`${API}/rooms/${encodeURIComponent(ROOM)}/messages?dir=b&limit=50`, { headers: { Authorization: "Bearer " + token } });
+        let hist = await fetch(`${API}/rooms/${encodeURIComponent(ROOM)}/messages?dir=b&limit=50`, { headers: { Authorization: "Bearer " + token } });
+        if (hist.status === 401) {
+          // The stored token expired while we were away — log in fresh once.
+          token = "";
+          await login();
+          hist = await fetch(`${API}/rooms/${encodeURIComponent(ROOM)}/messages?dir=b&limit=50`, { headers: { Authorization: "Bearer " + token } });
+        }
         if (!hist.ok) throw new Error("history " + hist.status);
         (await hist.json()).chunk.reverse().forEach(renderEvent);
         statusEl.textContent = "connected";

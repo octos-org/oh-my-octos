@@ -77,6 +77,11 @@ async function report(p) {
   assert.equal(await p.getByPlaceholder("https://octos.example.com").inputValue(), BASE);
   await p.getByRole("button", { name: "Connect", exact: true }).click();
   await p.getByText("Choose a workspace", { exact: true }).first().waitFor({ timeout: 20000 });
+  // NOTE: `_addButton_3mdup_357` is a CSS-modules hash from the octoscode-web
+  // build — it changes every time the frontend is rebuilt. If this step fails
+  // right after an update, inspect the "add workspace" button in DevTools and
+  // paste the new hashed class here (or give the button a stable data-testid
+  // upstream).
   await p.locator("button._addButton_3mdup_357").click();
   await p.getByPlaceholder("/srv/projects/octoscode").fill(WORKSPACE);
   await p.getByRole("button", { name: "Add & Start" }).click();
@@ -112,3 +117,11 @@ async function report(p) {
 
 await browser.close();
 console.log("\nsummary:", results.map((r) => `${r.name}:${r.errors.length === 0 ? "PASS" : "WARN"}`).join(" "));
+
+// A check that never fails is not a check: any tracked error (pageerror,
+// console error, unexpected 404) fails the run so this can gate deploys.
+const warned = results.filter((r) => r.errors.length > 0);
+if (warned.length > 0) {
+  console.error(`\nFAIL: ${warned.length}/${results.length} flows reported errors: ${warned.map((r) => r.name).join(", ")}`);
+  process.exitCode = 1;
+}

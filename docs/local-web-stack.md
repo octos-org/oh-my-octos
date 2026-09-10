@@ -99,6 +99,10 @@ one click; the admin card seeds `octos_auth_token` for auto-login.
 The `examples/local-web-stack/matrix-chat/index.html` template is a tiny
 same-origin client that auto-logs into a room and live-syncs it. The
 `/_matrix/*` Caddy route makes it same-origin, so no CORS work is needed.
+Copy it to `~/octos-clients/matrix-chat/` and fill in the three placeholders:
+`REPLACE_WITH_MATRIX_USER` is the **bare localpart** (`octos`, not
+`@octos:localhost` — senders are compared after the server part is stripped),
+plus the account password and the room id.
 
 Server side, a Synapse in a venv is the least moving part:
 
@@ -152,12 +156,23 @@ selected with `"type": "feishu", "region": "global", "mode": "webhook"`.
 `examples/local-web-stack/e2e.mjs` drives real Chromium with Playwright and
 verifies every entry, not just HTTP status codes: launcher cards, `/app` solo
 login, `/admin` auto-login, `/code` connect + workspace open, `/learn`
-whiteboard, and a Matrix send/reply round trip. Run it after any change:
+whiteboard, and a Matrix send/reply round trip. Keep it outside the repo so
+its `artifacts/` screenshots do not dirty the checkout, and adapt the
+machine-specific constants at the top (`WORKSPACE`, `EXPECTED_MODEL`,
+`MATRIX_ROOM_MARKER`, `MATRIX_HISTORY_MARKER`). Run it after any change:
 
 ```sh
+mkdir -p ~/octos-clients/e2e
+cp examples/local-web-stack/e2e.mjs ~/octos-clients/e2e/
 cd ~/octos-clients/e2e && npm i -D playwright && npx playwright install chromium
 node e2e.mjs
 ```
+
+The script exits non-zero when any flow reports a page error, console error,
+or unexpected 404, so it can gate a deploy or a launchd watchdog. One selector
+is a CSS-modules hash from the octoscode-web build (`button._addButton_*`);
+it changes on every frontend rebuild — the inline comment in e2e.mjs explains
+how to refresh it.
 
 Also kill the octos process once and confirm launchd restarts it and `/app/`
 recovers, since keep-alive is part of the deployment contract.
