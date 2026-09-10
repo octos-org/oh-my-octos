@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Octos Launchpad</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b0f1a; --card:#121a2b; --border:#253451; --text:#e8eefb; --muted:#93a4c3; --accent:#6da8ff; --green:#3ddc97; --red:#ff6b6b; --amber:#ffbe5c; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(1200px 700px at 20% -10%,#16254a 0%,var(--bg) 55%); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; padding:56px 24px 64px; }
+    .wrap { max-width:1080px; margin:0 auto; }
+    .status { display:inline-flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); background:rgba(61,220,151,.08); border:1px solid rgba(61,220,151,.25); border-radius:999px; padding:6px 12px; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--green); }
+    .status.offline .dot { background:var(--red); }
+    h1 { margin:18px 0 8px; font-size:34px; }
+    .sub { margin:0; color:var(--muted); font-size:15px; line-height:1.6; }
+    h2 { margin:42px 0 16px; font-size:13px; text-transform:uppercase; letter-spacing:2px; color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
+    a.card { display:block; text-decoration:none; color:inherit; background:linear-gradient(180deg,var(--card),#10182a); border:1px solid var(--border); border-radius:16px; padding:22px; transition:transform .15s ease,border-color .15s ease; }
+    a.card:hover { transform:translateY(-2px); border-color:var(--accent); }
+    .card .name { font-size:17px; font-weight:650; }
+    .card .desc { margin-top:8px; font-size:13px; line-height:1.55; color:var(--muted); }
+    .card .go { margin-top:18px; font-size:13px; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; margin:12px 0 24px; font-size:13px; }
+    th { text-align:left; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px; padding:8px 10px; border-bottom:1px solid var(--border); }
+    td { padding:10px; border-bottom:1px solid rgba(37,52,81,.55); vertical-align:top; }
+    code, .cmd { color:#b9e6ff; }
+    .cmd { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:12px; background:#0a101c; border-radius:8px; padding:2px 7px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; white-space:nowrap; }
+    .badge.ok { background:rgba(61,220,151,.14); color:var(--green); }
+    .badge.warn { background:rgba(255,190,92,.14); color:var(--amber); }
+    .badge.bad { background:rgba(255,107,107,.14); color:var(--red); }
+    details { background:#0d1422; border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+    summary { cursor:pointer; font-weight:600; font-size:14px; }
+    details p { color:var(--muted); font-size:13px; line-height:1.7; }
+    footer { margin-top:52px; color:var(--muted); font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="status" id="status"><span class="dot"></span><span id="status-text">checking…</span></div>
+      <h1>Octos Launchpad</h1>
+      <p class="sub">One local entry for the whole Octos stack. This page is the living manual: cards, ports, models, channels, login behavior, ops commands, and troubleshooting are all documented here.</p>
+    </header>
+
+    <h2>Web apps</h2>
+    <div class="grid">
+      <a class="card" data-target="app" href="/app/"><div class="name">Octos</div><div class="desc">Chat, voice, slides and settings. Local solo login.</div><div class="go">open /app/ →</div></a>
+      <a class="card" data-target="admin" href="/admin/"><div class="name">Admin</div><div class="desc">Profiles, users, channels and system. Admin token is auto-filled by this page.</div><div class="go">open /admin/ →</div></a>
+      <a class="card" data-target="code" href="/code/"><div class="name">Octos Code</div><div class="desc">Browser coding workspace. This card fetches a local solo token and pre-fills Connect.</div><div class="go">open /code/ →</div></a>
+      <a class="card" data-target="learn" href="/learn/"><div class="name">Octos Learn</div><div class="desc">AI whiteboard lessons; solo login, then choose text-only mode.</div><div class="go">open /learn/ →</div></a>
+      <a class="card" data-target="matrix" href="/matrix-chat/"><div class="name">Matrix chat</div><div class="desc">One-click local Matrix room; auto-login and live sync, no form to fill.</div><div class="go">open /matrix-chat/ →</div></a>
+    </div>
+
+    <h2>Terminal clients</h2>
+    <p style="color:var(--muted);font-size:13px;">Run <span class="cmd">octoscode</span> for the coding terminal client or <span class="cmd">octos-tui</span> for the general terminal client. Both reach the server over the UI Protocol.</p>
+
+    <h2>Services and ports</h2>
+    <table>
+      <tr><th>service</th><th>address</th><th>notes</th></tr>
+      <tr><td>Caddy entry</td><td><code>http://localhost:8080</code></td><td>the only public listener, bound to loopback</td></tr>
+      <tr><td>octos serve</td><td><code>127.0.0.1:50080</code></td><td>REST + WebSocket, embedded /app and /admin</td></tr>
+      <tr><td>profile gateway</td><td><code>127.0.0.1:9402</code></td><td>channels reach the agent here</td></tr>
+      <tr><td>Lark webhook</td><td><code>:9321</code></td><td>keep behind ngrok; do not publish directly</td></tr>
+      <tr><td>Synapse</td><td><code>127.0.0.1:8008</code></td><td>local Matrix homeserver</td></tr>
+      <tr><td>ngrok</td><td><code>https://YOUR.ngrok-free.dev</code></td><td>optional public ingress for Lark callbacks</td></tr>
+    </table>
+
+    <h2>Models and keys</h2>
+    <table>
+      <tr><th>provider</th><th>status</th><th>notes</th></tr>
+      <tr><td>DeepSeek v4-flash</td><td><span class="badge ok">primary</span></td><td>primary model; key stored in macOS keychain</td></tr>
+      <tr><td>DeepSeek v4-pro</td><td><span class="badge ok">fallback</span></td><td>automatic failover target</td></tr>
+      <tr><td>other providers</td><td><span class="badge warn">as configured</span></td><td>store via <span class="cmd">octos auth set-key NAME VALUE</span>; update this table with the tested status</td></tr>
+    </table>
+
+    <h2>Channels</h2>
+    <table>
+      <tr><th>channel</th><th>state</th><th>how to finish it</th></tr>
+      <tr><td>Telegram</td><td><span class="badge warn">token set; network dependent</span></td><td>pull the bot into any group; messages reach the agent automatically</td></tr>
+      <tr><td>Lark (international)</td><td><span class="badge warn">webhook running</span></td><td>console: bot capability → request URL <span class="cmd">https://YOUR.ngrok-free.dev/webhook/feishu/&lt;profile&gt;</span> → event <span class="cmd">im.message.receive_v1</span> → permissions → publish</td></tr>
+      <tr><td>Matrix</td><td><span class="badge ok">local room</span></td><td>bot <code>@octos:localhost</code> joined the room; see matrix-chat page</td></tr>
+    </table>
+
+    <h2>Login behavior</h2>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7;">
+      <span class="cmd">/app</span>, <span class="cmd">/admin</span>, <span class="cmd">/learn</span>: click “Continue without a password” (local solo). The admin card also seeds <code>octos_auth_token</code> from the constant below.<br/>
+      <span class="cmd">/code</span>: this page fetches <span class="cmd">/api/auth/solo</span>, seeds octoscode-web's tab storage, then Connect is one click; pick a workspace and Add &amp; Start.<br/>
+      <span class="cmd">/matrix-chat</span>: the page logs in with the local account automatically.
+    </p>
+
+    <h2>Ops</h2>
+    <details>
+      <summary>restart / status / logs</summary>
+      <p><span class="cmd">launchctl kickstart -k gui/$(id -u)/local.octos.serve</span> · <span class="cmd">local.matrix.synapse</span> · <span class="cmd">local.ngrok</span><br/>
+      <span class="cmd">brew services restart caddy</span> · <span class="cmd">brew services list</span><br/>
+      logs: <span class="cmd">~/.octos/logs/serve.out.log</span>, <span class="cmd">~/octos-matrix/synapse.log</span>, <span class="cmd">~/.octos/logs/ngrok.out.log</span></p>
+    </details>
+    <details>
+      <summary>update</summary>
+      <p>octos: <span class="cmd">npm update -g @octos-org/octos</span> + restart. Frontends: git pull, pnpm install, rebuild with <span class="cmd">OCTOSCODE_WEB_BASE_PATH=/code/</span> or <span class="cmd">BASE_URL=/learn/</span>. This static page reloads without a restart.</p>
+    </details>
+    <details>
+      <summary>troubleshooting</summary>
+      <p>Telegram unreachable = network blocks api.telegram.org. Lark 404 = request URL/ngrok mismatch. Admin locked out = solo login then rotate the 8-char token and update the constant in this file. Ports: <span class="cmd">lsof -nP -iTCP:8080 -iTCP:50080 -iTCP:8008</span></p>
+    </details>
+
+    <footer>Everything listens on loopback. Secrets live in the macOS keychain or 0600 local files; this page references them without embedding API keys.</footer>
+  </div>
+
+  <script>
+    // Replace with the persistent 8-character admin token created by the dashboard wizard.
+    const ADMIN_TOKEN = "REPLACE_WITH_ADMIN_TOKEN";
+
+    const status = document.getElementById("status");
+    const statusText = document.getElementById("status-text");
+    fetch("/api/auth/status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(() => (statusText.textContent = "octos serve online"))
+      .catch(() => { status.classList.add("offline"); statusText.textContent = "octos serve offline"; });
+
+    document.querySelector('a[data-target="admin"]').addEventListener("click", (event) => {
+      event.preventDefault();
+      localStorage.setItem("octos_auth_token", ADMIN_TOKEN);
+      window.location.href = "/admin/";
+    });
+
+    document.querySelector('a[data-target="code"]').addEventListener("click", async (event) => {
+      event.preventDefault();
+      try {
+        const response = await fetch("/api/auth/solo", { method: "POST" });
+        if (response.ok) {
+          const { token } = await response.json();
+          const endpoint = window.location.origin;
+          localStorage.setItem("octoscode-web.connection.v2", JSON.stringify({ version: 2, endpoint }));
+          sessionStorage.setItem("octoscode-web.tab-connection.v3", JSON.stringify({
+            version: 3, endpoint, token, sessionId: "", profileId: "", cwd: "",
+            autoConnect: true, knownSessions: [],
+          }));
+        }
+      } catch { /* fall through to the manual gate */ }
+      window.location.href = "/code/";
+    });
+  </script>
+</body>
+</html>

@@ -55,6 +55,17 @@ Copy this to your agent (Claude Code, Codex, Cindy, octoscode, ...) to set up Oc
 Install Octos and oh-my-octos on this machine. Read https://github.com/octos-org/oh-my-octos and follow the steps `oh-my-octos setup` performs, using the octos commands directly: check for an existing octos binary, run `octos init` if there is no config, sign in with `octos auth login --provider <name>`, install the skill with `octos skills --profile <id> install octos-org/oh-my-octos` (and plainly `octos skills install octos-org/oh-my-octos` inside my project for `octos chat`), ask me which optional packs I want (slides, mofa, phonefarm; see the Optional packs table) and install those the same way, install octoscode, then run `octos doctor` and report what it says.
 ```
 
+## Local web stack
+
+A reference single-entry deployment of the whole local Octos surface — launcher
+page, embedded `/app` + `/admin`, production builds of octoscode-web and
+octos-learn, a one-click local Matrix room, launchd supervision, and a real
+browser end-to-end check — lives in [docs/local-web-stack.md](docs/local-web-stack.md)
+with templates under [examples/local-web-stack/](examples/local-web-stack/).
+It documents the deployment caveats (loopback-only Caddy, Origin handling on
+octos 2.0.2, typed profile channels, launchd PATH, Synapse packaging) so the
+next machine can follow it without rediscovering them.
+
 ## Measured
 
 `cargo run --example bench -- --octos <bin>`, 2026-09-04, octos 2.0.3-rc.10, deepseek-v4-flash, six small graded coding tasks, two repeats each, same binary and flags in both arms. Medians per run:
